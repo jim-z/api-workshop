@@ -24,35 +24,90 @@ var map = new ol.Map({
   })
 });
 
-//Change user key if you reuse this!
+// SETUP APPLICATION LOGIC HERE
 
-var app= {
-  mapzenKey: 'mapzen-CpAANqF',
+var app = {
+  mapzenKey: 'mapzen-CpAANqF', 
   activeSearch: 'from',
-  
+  options: [],
+  selection: {
+    from: {},
+    to: {}
+  },
+
   typeAhead: function(e){
-    var el=e.target;
-    var val=el.value;
-    
-    if(val.length>2){
-    app.queryAutocomplete(val, function(err,data){
-      console.log(data);
+    var el = e.target;
+    var val = el.value;
+    if(val.length > 2){
+      app.queryAutocomplete(val, function(err, data){
+        if(err) return console.log(err);
+        if(data.features) app.options = data.features;
+        app.renderResultsList();
+      })
+    }else{
+      app.clearList();
+    }
+ },
+
+  queryAutocomplete: throttle(function(text, callback){
+    $.ajax({
+      url: 'https://search.mapzen.com/v1/autocomplete?text=' + text + '&api_key=' + app.mapzenKey, 
+      success: function(data, status, req){
+        callback(null, data);
+      },
+      error: function(req, status, err){
+        callback(err)
+      }
     })
+  }, 150),
+
+  renderResultsList: function(){
+    var resultsList = $('#results-list');
+    resultsList.empty();
+
+    var results = app.options.map(function(feature){
+      var li = $('<li class="results-list-item">' + feature.properties.label + '</li>');
+      li.on('click', function(){
+        app.selectItem(feature);
+      })
+      return li;
+    })
+
+    resultsList.append(results);
+
+    if(app.options.length > 0){
+      resultsList.removeClass('hidden');
+    }else{
+      resultsList.addClass('hidden');
     }
   },
-  queryAutocomplete: throttle(function(text, callback){
-	$.ajax({
-  	url:'https://search.mapzen.com/v1/autocomplete?
-  	text= '+text+'&api_key='+app.mapzenKey,
-  		success: function(data,status,req){
-			callback(null,data);
-		},
-    	error: function(req,status,err){
-          	callback(err);
-        }
-	})
-	},150)
+
+  selectItem: function(feature){
+    app.selection[app.activeSearch] = feature;
+    var elId = '#search-' + app.activeSearch + '-input';
+    $(elId).val(feature.properties.label);
+    app.clearList();
+  },
+
+  clearList: function(e){
+    app.options = [];
+    app.renderResultsList();
+  },
+
+  clearSearch: function(e){
+    var elId = '#search-' + e.data.input + '-input';
+    $(elId).val('').trigger('keyup');
+    app.selection[e.data.input] = {};
+  }
+
 }
 
-$('#search-from-input').on('keyup',{input:'from'},
-app.typeAhead);
+// SETUP EVENT BINDING HERE
+
+$('#search-from-input').on('keyup', {input:'from'}, app.typeAhead);
+$('#clear-from-search').on('click', {input:'from'}, app.clearSearch);
+$('#search-from-input').on('focus', function(){app.activeSearch = 'from'});
+
+$('#search-to-input').on('keyup', {input:'to'}, app.typeAhead);
+$('#search-to-input').on('focus', function(){app.activeSearch = 'to'});
+$('#clear-to-search').on('click', {input:'to'}, app.clearSearch);
