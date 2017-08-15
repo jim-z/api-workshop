@@ -33,9 +33,12 @@ var app= {
   typeAhead: function(e){
     var el=e.target;
     var val=el.value;
+    
+    if(val.length>2){
     app.queryAutocomplete(val, function(err,data){
       console.log(data);
     })
+    }
   },
   queryAutocomplete: throttle(function(text, callback){
 	$.ajax({
